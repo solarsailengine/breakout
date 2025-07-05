@@ -18,15 +18,15 @@ config.paddle = {
 	width = 0.3,
 	height = 0.05,
 	speed = 2.0,  -- World units per second
-	y_position = -0.1  -- Near bottom of screen
+	y_position = -0.7  -- Lower on screen for more gameplay area
 }
 
 -- Ball configuration
 config.ball = {
 	radius = 0.03,
-	initial_speed = 1.0,
-	max_speed = 2.5,
-	speed_increase = 1.05  -- Multiply speed by this on paddle hit
+	initial_speed = 2.0,  -- Increased from 1.0 to test high-speed collision
+	max_speed = 4.0,      -- Increased from 2.5 to test max speed scenarios
+	speed_increase = 1.1  -- Increased from 1.05 for more aggressive speed increase
 }
 
 -- Brick configuration
@@ -35,7 +35,7 @@ config.bricks = {
 	cols = 10,
 	width = 0.15,
 	height = 0.06,  -- Taller bricks (4x taller than before)
-	spacing = 0.01,  -- Tighter spacing for taller bricks
+	spacing = 0.005,  -- Even tighter spacing to test collision accuracy
 	start_y = 0.5,  -- Adjusted for tighter spacing
 	colors = {
 		{1.0, 0.2, 0.2, 1.0},  -- Red (top row, most points)

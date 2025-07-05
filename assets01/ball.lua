@@ -13,28 +13,108 @@ function script:on_init()
 	self.vy = 0
 	self.active = false
 	
+	log(string.format("Ball initialized at position (%.3f, %.3f)", self.x, self.y))
+	
 	-- Set initial position
 	local transform = getcomponent(self.entity, "transform")
 	if transform then
 		transform.translation = vec3(self.x, self.y, 0)
+		log(string.format("Ball transform set to (%.3f, %.3f, %.3f)", 
+			transform.translation.x, transform.translation.y, transform.translation.z))
 	end
 	
 	-- Cache input
 	self.space_key = Input.getbuttonidforname("SPACE")
 end
 
-function script:check_brick_collisions()
+-- Custom line-AABB intersection function removed - now using engine aabb:raycast() method
+
+-- Manual line-AABB intersection for reliable collision detection
+function script:line_intersects_aabb(x1, y1, x2, y2, aabb_min_x, aabb_min_y, aabb_max_x, aabb_max_y)
+	local dx = x2 - x1
+	local dy = y2 - y1
+	
+	if dx == 0 and dy == 0 then return nil end -- No movement
+	
+	-- Calculate intersection times for each axis
+	local t_min = -math.huge
+	local t_max = math.huge
+	local hit_normal_x, hit_normal_y = 0, 0
+	
+	-- X axis
+	if dx ~= 0 then
+		local t1 = (aabb_min_x - x1) / dx
+		local t2 = (aabb_max_x - x1) / dx
+		
+		if t1 > t2 then t1, t2 = t2, t1 end
+		
+		if t1 > t_min then
+			t_min = t1
+			hit_normal_x = dx > 0 and -1 or 1
+			hit_normal_y = 0
+		end
+		
+		if t2 < t_max then
+			t_max = t2
+		end
+	else
+		-- Line is vertical, check if it's within X bounds
+		if x1 < aabb_min_x or x1 > aabb_max_x then
+			return nil
+		end
+	end
+	
+	-- Y axis
+	if dy ~= 0 then
+		local t1 = (aabb_min_y - y1) / dy
+		local t2 = (aabb_max_y - y1) / dy
+		
+		if t1 > t2 then t1, t2 = t2, t1 end
+		
+		if t1 > t_min then
+			t_min = t1
+			hit_normal_x = 0
+			hit_normal_y = dy > 0 and -1 or 1
+		end
+		
+		if t2 < t_max then
+			t_max = t2
+		end
+	else
+		-- Line is horizontal, check if it's within Y bounds
+		if y1 < aabb_min_y or y1 > aabb_max_y then
+			return nil
+		end
+	end
+	
+	-- Check if intersection exists and is within line segment
+	if t_min <= t_max and t_min >= 0 and t_min <= 1 then
+		local hit_x = x1 + t_min * dx
+		local hit_y = y1 + t_min * dy
+		
+		return {
+			x = hit_x,
+			y = hit_y,
+			normal_x = hit_normal_x,
+			normal_y = hit_normal_y,
+			distance = t_min
+		}
+	end
+	
+	return nil
+end
+
+-- Ray-cast collision detection using manual line-AABB intersection
+function script:raycast_brick_collision(old_x, old_y, new_x, new_y)
 	-- Get game controller from game state
 	local controller_script = game_state.game_controller_script
-	if not controller_script or not controller_script.bricks then return end
+	if not controller_script or not controller_script.bricks then return nil end
 	
-	-- First pass: find all colliding bricks
-	local colliding_bricks = {}
-	local ball_left = self.x - config.ball.radius
-	local ball_right = self.x + config.ball.radius
-	local ball_top = self.y + config.ball.radius
-	local ball_bottom = self.y - config.ball.radius
+	local closest_hit = nil
+	local closest_distance = math.huge
+	local closest_brick_info = nil
 	
+	-- Cast ray against all active bricks, find closest intersection
 	for _, brick_info in ipairs(controller_script.bricks) do
 		if not brick_info.destroyed then
 			local brick_transform = getcomponent(brick_info.entity, "transform")
@@ -42,98 +122,73 @@ function script:check_brick_collisions()
 				local brick_x = brick_transform.translation.x
 				local brick_y = brick_transform.translation.y
 				
-				local brick_left = brick_x - config.bricks.width / 2
-				local brick_right = brick_x + config.bricks.width / 2
-				local brick_top = brick_y + config.bricks.height / 2
-				local brick_bottom = brick_y - config.bricks.height / 2
+				-- Create expanded AABB for brick (includes ball radius for point raycast)
+				local min_x = brick_x - config.bricks.width / 2 - config.ball.radius
+				local min_y = brick_y - config.bricks.height / 2 - config.ball.radius
+				local max_x = brick_x + config.bricks.width / 2 + config.ball.radius
+				local max_y = brick_y + config.bricks.height / 2 + config.ball.radius
 				
-				-- Check collision
-				if ball_right >= brick_left and ball_left <= brick_right and
-				   ball_bottom <= brick_top and ball_top >= brick_bottom then
-					table.insert(colliding_bricks, {
-						info = brick_info,
-						x = brick_x,
-						y = brick_y,
-						left = brick_left,
-						right = brick_right,
-						top = brick_top,
-						bottom = brick_bottom
-					})
+				-- Use manual line-AABB intersection
+				local hit = self:line_intersects_aabb(old_x, old_y, new_x, new_y, min_x, min_y, max_x, max_y)
+				
+				if hit and hit.distance < closest_distance then
+					closest_hit = hit
+					closest_distance = hit.distance
+					closest_brick_info = brick_info
 				end
 			end
 		end
 	end
 	
-	-- Process only the first collision to prevent multi-hit bugs
+	if closest_hit then
+		return {
+			hit = closest_hit,
+			brick_info = closest_brick_info
+		}
+	end
 	
-	-- Process only the first collision
-	if #colliding_bricks > 0 then
-		local brick = colliding_bricks[1]
-		local brick_info = brick.info
-		
-		-- Process collision
-		
-		-- Mark brick as destroyed and hide it
-		brick_info.destroyed = true
-		
-		-- Hide the brick instead of destroying it
-		local renderer = getcomponent(brick_info.entity, "spriterenderer")
-		if renderer then
-			renderer.visible = false
-		end
-		
-		-- Update game state
-		controller_script.score = controller_script.score + brick_info.points
-		controller_script.bricks_remaining = controller_script.bricks_remaining - 1
-		
-		-- Removed verbose logging
-		
-		-- Determine bounce direction
-		local overlap_left = ball_right - brick.left
-		local overlap_right = brick.right - ball_left
-		local overlap_top = ball_bottom - brick.top
-		local overlap_bottom = brick.bottom - ball_top
-		
-		local min_overlap = math.min(overlap_left, overlap_right, overlap_top, overlap_bottom)
-		
-		-- Bounce based on smallest overlap
-		
-		-- Calculate safe repositioning distance considering brick spacing
-		local safe_buffer = config.bricks.spacing + config.bricks.height / 2 + 0.01
-		
-		if min_overlap == overlap_left then
-			self.vx = -math.abs(self.vx)
-			self.x = brick.left - config.ball.radius - 0.001
-			-- Bouncing left
-		elseif min_overlap == overlap_right then
-			self.vx = math.abs(self.vx)
-			self.x = brick.right + config.ball.radius + 0.001
-			-- Bouncing right
-		elseif min_overlap == overlap_top then
-			self.vy = math.abs(self.vy)
-			-- Move ball far enough to avoid hitting the brick above
-			self.y = brick.top + config.ball.radius + safe_buffer
-			-- Bouncing up
-		else
-			self.vy = -math.abs(self.vy)
-			-- Move ball far enough to avoid hitting the brick below
-			self.y = brick.bottom - config.ball.radius - safe_buffer
-			-- Bouncing down
-		end
-		
-		-- Position and velocity updated
-		
-		-- Update transform immediately to prevent multiple collisions
-		local transform = getcomponent(self.entity, "transform")
-		if transform then
-			transform.translation = vec3(self.x, self.y, 0)
-		end
-		
-		-- Check for victory
-		if controller_script.bricks_remaining == 0 then
-			log("Victory! All bricks destroyed!")
-			self.active = false
-		end
+	return nil
+end
+
+function script:handle_brick_collision(collision)
+	local hit = collision.hit
+	local brick_info = collision.brick_info
+	
+	-- CRITICAL: Position ball at collision point, not beyond it
+	-- This prevents tunneling through multiple bricks
+	self.x = hit.x
+	self.y = hit.y
+	
+	-- Reflect velocity based on collision normal
+	local dot = self.vx * hit.normal_x + self.vy * hit.normal_y
+	self.vx = self.vx - 2 * dot * hit.normal_x
+	self.vy = self.vy - 2 * dot * hit.normal_y
+	
+	-- Destroy the brick
+	brick_info.destroyed = true
+	
+	-- Hide the brick
+	local renderer = getcomponent(brick_info.entity, "spriterenderer")
+	if renderer then
+		renderer.visible = false
+	end
+	
+	-- Update game state
+	local controller_script = game_state.game_controller_script
+	controller_script.score = controller_script.score + brick_info.points
+	controller_script.bricks_remaining = controller_script.bricks_remaining - 1
+	
+	
+	-- Update transform immediately
+	local transform = getcomponent(self.entity, "transform")
+	if transform then
+		transform.translation = vec3(self.x, self.y, 0)
+	end
+	
+	-- Check for victory
+	if controller_script.bricks_remaining == 0 then
+		log("Victory! All bricks destroyed!")
+		self.active = false
 	end
 end
 
@@ -146,20 +201,17 @@ function script:check_paddle_collision()
 	local paddle_x = paddle_script.x
 	local paddle_y = config.paddle.y_position
 	
-	-- AABB collision check
-	local ball_left = self.x - config.ball.radius
-	local ball_right = self.x + config.ball.radius
-	local ball_top = self.y + config.ball.radius
-	local ball_bottom = self.y - config.ball.radius
+	-- Create sphere for ball using engine primitives
+	local ball_sphere = sphere(vector3(self.x, self.y, 0), config.ball.radius)
 	
-	local paddle_left = paddle_x - config.paddle.width / 2
-	local paddle_right = paddle_x + config.paddle.width / 2
-	local paddle_top = paddle_y + config.paddle.height / 2
-	local paddle_bottom = paddle_y - config.paddle.height / 2
+	-- Create AABB for paddle using engine primitives
+	local paddle_aabb = aabb(
+		vector3(paddle_x - config.paddle.width / 2, paddle_y - config.paddle.height / 2, 0),
+		vector3(paddle_x + config.paddle.width / 2, paddle_y + config.paddle.height / 2, 0)
+	)
 	
-	-- Check collision
-	if ball_right >= paddle_left and ball_left <= paddle_right and
-	   ball_bottom <= paddle_top and ball_top >= paddle_bottom then
+	-- Check collision using engine sphere-AABB intersection
+	if ball_sphere:intersects(paddle_aabb) then
 		-- Only bounce if ball is moving downward
 		if self.vy < 0 then
 			-- Calculate hit position (-1 to 1, where 0 is center)
@@ -177,7 +229,7 @@ function script:check_paddle_collision()
 			self.vy = math.abs(math.cos(bounce_angle)) * speed
 			
 			-- Move ball above paddle to prevent multiple collisions
-			self.y = paddle_top + config.ball.radius
+			self.y = paddle_y + config.paddle.height / 2 + config.ball.radius
 		end
 	end
 end
@@ -189,6 +241,7 @@ function script:on_message(msg, data)
 		self.y = config.paddle.y_position + 0.1
 		self.vx = 0
 		self.vy = 0
+		log(string.format("Ball reset to position (%.3f, %.3f)", self.x, self.y))
 	end
 end
 
@@ -206,50 +259,67 @@ function script:on_update()
 		local angle = math.random() * math.pi/3 - math.pi/6
 		self.vx = math.sin(angle) * config.ball.initial_speed
 		self.vy = math.cos(angle) * config.ball.initial_speed
-		log("Ball launched!")
+		log(string.format("Ball launched! Position: (%.3f, %.3f), Velocity: (%.3f, %.3f)", 
+			self.x, self.y, self.vx, self.vy))
 	end
 	
 	if self.active then
 		
 		local dt = Time.deltaTime
 		
-		-- Update position
-		self.x = self.x + self.vx * dt
-		self.y = self.y + self.vy * dt
+		-- Store current position as previous for ray-casting
+		local old_x = self.x
+		local old_y = self.y
 		
-		-- Wall collisions
-		if self.x - config.ball.radius <= config.PLAY_AREA.left then
-			self.x = config.PLAY_AREA.left + config.ball.radius
-			self.vx = math.abs(self.vx)
-		elseif self.x + config.ball.radius >= config.PLAY_AREA.right then
-			self.x = config.PLAY_AREA.right - config.ball.radius
-			self.vx = -math.abs(self.vx)
+		-- Calculate potential new position
+		local new_x = self.x + self.vx * dt
+		local new_y = self.y + self.vy * dt
+		
+		-- Check for brick collisions BEFORE moving
+		local collision = self:raycast_brick_collision(old_x, old_y, new_x, new_y)
+		
+		if collision then
+			-- Handle brick collision and stop at collision point
+			self:handle_brick_collision(collision)
+		else
+			-- No brick collision, move to new position
+			self.x = new_x
+			self.y = new_y
+			
+			-- Wall collisions (after safe movement)
+			if self.x - config.ball.radius <= config.PLAY_AREA.left then
+				self.x = config.PLAY_AREA.left + config.ball.radius
+				self.vx = math.abs(self.vx)
+			elseif self.x + config.ball.radius >= config.PLAY_AREA.right then
+				self.x = config.PLAY_AREA.right - config.ball.radius
+				self.vx = -math.abs(self.vx)
+			end
+			
+			-- Ceiling collision
+			if self.y + config.ball.radius >= config.PLAY_AREA.top then
+				self.y = config.PLAY_AREA.top - config.ball.radius
+				self.vy = -math.abs(self.vy)
+			end
 		end
-		
-		-- Ceiling collision
-		if self.y + config.ball.radius >= config.PLAY_AREA.top then
-			self.y = config.PLAY_AREA.top - config.ball.radius
-			self.vy = -math.abs(self.vy)
-		end
-		
-		-- Brick collisions
-		self:check_brick_collisions()
 		
 		-- Paddle collision
 		self:check_paddle_collision()
 		
 		-- Floor (reset)
 		if self.y - config.ball.radius <= config.PLAY_AREA.bottom then
+			log(string.format("Ball hit floor! Resetting from (%.3f, %.3f)", self.x, self.y))
 			self.active = false
 			self.x = 0
 			self.y = config.paddle.y_position + 0.1
 			self.vx = 0
 			self.vy = 0
+			log(string.format("Ball reset to (%.3f, %.3f)", self.x, self.y))
 			
 			-- Notify game controller of life lost
 			local controller = game_state.game_controller_script
 			if controller then
 				broadcast("ball_lost", {})
+				log("Broadcast ball_lost message")
 			end
 		end
 	end

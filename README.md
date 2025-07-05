@@ -4,15 +4,16 @@ A classic Breakout/Arkanoid clone demonstrating physics, collision detection, an
 
 ## Current Status
 
-✅ **FULLY PLAYABLE** - All core mechanics implemented:
+✅ **FULLY PLAYABLE** - All core mechanics implemented and optimized:
 - Paddle movement with arrow keys/A/D
 - Ball launching with SPACE
 - Paddle-ball collision with angle control
 - 50 bricks dynamically spawned
-- Ball-brick collision and destruction
+- Ball-brick collision and destruction with ray-cast collision detection
 - Score tracking (10-50 points per brick)
 - Lives system (3 lives)
 - Game over and restart functionality
+- ✅ **Multi-collision bug fixed** - Uses proper continuous collision detection
 
 ## Controls
 - **Left/Right Arrow** or **A/D**: Move paddle
@@ -40,10 +41,14 @@ A classic Breakout/Arkanoid clone demonstrating physics, collision detection, an
    - Template defined in `game.json`
    - 50 instances created dynamically at runtime
 
-3. **Frame-Independent Movement**: Uses `Time.deltaTime` for all physics
+3. **Ray-Cast Collision Detection**: Uses engine raycast methods for accurate collision
+   - Prevents multi-collision bugs by checking entire movement path
+   - Always hits closest brick first for proper temporal ordering
+
+4. **Frame-Independent Movement**: Uses `Time.deltaTime` for all physics
    - Ensures consistent gameplay at any framerate
 
-4. **Component Pattern**: Each game object (paddle, ball, brick) has its own script
+5. **Component Pattern**: Each game object (paddle, ball, brick) has its own script
    - Promotes code organization and reusability
 
 ### File Structure
