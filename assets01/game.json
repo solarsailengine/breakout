@@ -1,0 +1,78 @@
+{
+	"name": "breakout_game_scene",
+	"templates": [
+		{
+			"name": "paddle",
+			"script": {
+				"path": "paddle.lua"
+			},
+			"transform": {
+				"scale": {
+					"x": 0.3,
+					"y": 0.1,
+					"z": 1
+				}
+			},
+			"spriterenderer": {
+				"layer": 10
+			},
+			"staticsprite": {
+				"atlas": "atlas",
+				"name": "paddle"
+			}
+		},
+		{
+			"name": "brick",
+			"transform": {
+				"scale": {
+					"x": 0.15,
+					"y": 0.2,
+					"z": 1
+				}
+			},
+			"spriterenderer": {
+				"layer": 9
+			},
+			"staticsprite": {
+				"atlas": "atlas",
+				"name": "brick"
+			}
+		},
+		{
+			"name": "ball",
+			"script": {
+				"path": "ball.lua"
+			},
+			"transform": {
+				"scale": {
+					"x": 0.06,
+					"y": 0.06,
+					"z": 1
+				}
+			},
+			"spriterenderer": {
+				"layer": 11
+			},
+			"staticsprite": {
+				"atlas": "atlas",
+				"name": "ball"
+			}
+		}
+	],
+	"entities": [
+		{
+			"name": "game_controller",
+			"script": {
+				"path": "game_controller.lua"
+			}
+		},
+		{
+			"name": "paddle",
+			"template": "paddle"
+		},
+		{
+			"name": "ball",
+			"template": "ball"
+		}
+	]
+}

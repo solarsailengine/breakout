@@ -1,0 +1,5 @@
+{
+	"nologo": true,
+	"script": "program.lua",
+	"scenes": ["game.json"]
+}
