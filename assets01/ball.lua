@@ -202,12 +202,12 @@ function script:check_paddle_collision()
 	local paddle_y = config.paddle.y_position
 	
 	-- Create sphere for ball using engine primitives
-	local ball_sphere = sphere(vector3(self.x, self.y, 0), config.ball.radius)
+	local ball_sphere = sphere(vec3(self.x, self.y, 0), config.ball.radius)
 	
 	-- Create AABB for paddle using engine primitives
 	local paddle_aabb = aabb(
-		vector3(paddle_x - config.paddle.width / 2, paddle_y - config.paddle.height / 2, 0),
-		vector3(paddle_x + config.paddle.width / 2, paddle_y + config.paddle.height / 2, 0)
+		vec3(paddle_x - config.paddle.width / 2, paddle_y - config.paddle.height / 2, 0),
+		vec3(paddle_x + config.paddle.width / 2, paddle_y + config.paddle.height / 2, 0)
 	)
 	
 	-- Check collision using engine sphere-AABB intersection
