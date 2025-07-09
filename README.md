@@ -15,7 +15,6 @@ A classic Breakout/Arkanoid clone demonstrating physics, collision detection, an
 - Score tracking (10-50 points per brick)
 - Lives system (3 lives)
 - Game over and restart functionality
-- ✅ **Multi-collision bug fixed** - Uses proper continuous collision detection
 
 ## Controls
 - **Left/Right Arrow** or **A/D**: Move paddle
