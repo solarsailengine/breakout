@@ -2,6 +2,8 @@
 
 A classic Breakout/Arkanoid clone demonstrating physics, collision detection, and entity management in the SolarSail engine.
 
+![Breakout Game](screenshot.png)
+
 ## Current Status
 
 ✅ **FULLY PLAYABLE** - All core mechanics implemented and optimized:
