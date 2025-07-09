@@ -4,9 +4,7 @@ A classic Breakout/Arkanoid clone demonstrating physics, collision detection, an
 
 ![Breakout Game](screenshot.png)
 
-## Current Status
-
-✅ **FULLY PLAYABLE** - All core mechanics implemented and optimized:
+## Features
 - Paddle movement with arrow keys/A/D
 - Ball launching with SPACE
 - Paddle-ball collision with angle control
